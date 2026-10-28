@@ -1,0 +1,19 @@
+column,dtype,rows,null_pct,n_unique,min,max
+unique_key,string,632697,0.0000,>=200000,56412496,61661247
+created_date,datetime,632697,0.0000,>=200000,2023-01-01T00:01:16,2024-06-30T23:54:19
+closed_date,datetime,632697,0.1966,>=200000,2023-01-01T10:36:49,2026-07-08T18:11:17
+agency,string,632697,0.0000,1,HPD,HPD
+complaint_type,string,632697,0.0000,3,HEAT/HOT WATER,UNSANITARY CONDITION
+descriptor,string,632697,0.0000,25,APARTMENT ONLY,Water Supply
+status,string,632697,0.0000,4,Closed,Unspecified
+incident_zip,string,632697,0.0128,189,10000,12345
+borough,string,632697,0.0000,6,BRONX,UNSPECIFIED
+zip_borough,string,632697,0.0130,5,BRONX,STATEN ISLAND
+borough_mismatch,int,632697,0.0000,2,0,1
+population_zip,int,632697,0.0149,181,332,112750
+created_month,string,632697,0.0000,18,2023-01,2024-06
+created_hour,int,632697,0.0000,24,0,23
+created_dow,int,632697,0.0000,7,0,6
+is_closed,int,632697,0.0000,2,0,1
+resolution_hours,float,632697,0.1966,>=200000,0.000000,24143.657500
+resolution_days,float,632697,0.1966,>=200000,0.000000,1005.985729

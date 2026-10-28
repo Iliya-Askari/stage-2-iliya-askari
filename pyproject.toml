@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nyc311-factory"
+version = "1.0.0"
+description = "Data factory: NYC 311 complaints + population reference -> validated, quarantined, reproducible datasets"
+requires-python = ">=3.10"
+dynamic = ["dependencies"]
+
+[project.scripts]
+nyc311 = "nyc311_factory.cli:main"
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
+
+[tool.setuptools.packages.find]
+where = ["src"]

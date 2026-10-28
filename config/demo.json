@@ -1,0 +1,80 @@
+{
+  "source": {
+    "kind": "file",
+    "url": "",
+    "method": "GET",
+    "path": "data/demo_input/synthetic_311.jsonl",
+    "app_token_env": null
+  },
+  "window": {
+    "mode": "fixed",
+    "start": "2023-01-01",
+    "end": "2024-07-01"
+  },
+  "scope": {
+    "agencies": [
+      "HPD"
+    ]
+  },
+  "batch_size": 5000,
+  "max_retries": 5,
+  "backoff_seconds": 2.0,
+  "timeout_seconds": 120,
+  "max_raw_records": null,
+  "min_raw_records": 1000,
+  "quarantine_max_ratio": 0.1,
+  "min_rows_for_drift_check": 1000,
+  "rate_per_residents": 10000,
+  "population": {
+    "kind": "file",
+    "url": "https://api.census.gov/data/2022/acs/acs5",
+    "params": {
+      "get": "B01003_001E",
+      "for": "zip code tabulation area:*"
+    },
+    "value_column": "B01003_001E",
+    "zip_column": "zip code tabulation area",
+    "path": "data/demo_input/synthetic_population.csv",
+    "nyc_zip_prefixes": [
+      "100",
+      "101",
+      "102",
+      "103",
+      "104",
+      "110",
+      "111",
+      "112",
+      "113",
+      "114",
+      "116"
+    ],
+    "api_key_env": "CENSUS_API_KEY"
+  },
+  "zip_prefix_borough": {
+    "100": "MANHATTAN",
+    "101": "MANHATTAN",
+    "102": "MANHATTAN",
+    "103": "STATEN ISLAND",
+    "104": "BRONX",
+    "110": "QUEENS",
+    "111": "QUEENS",
+    "112": "BROOKLYN",
+    "113": "QUEENS",
+    "114": "QUEENS",
+    "116": "QUEENS"
+  },
+  "zip_placeholders": [
+    "00000",
+    "N/A",
+    "A/N",
+    "NA",
+    "NONE",
+    "UNKNOWN",
+    "UNSPECIFIED"
+  ],
+  "paths": {
+    "raw": "data/demo_raw",
+    "curated": "data/demo_curated",
+    "state": "data/demo_state"
+  }
+}

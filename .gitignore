@@ -1,0 +1,17 @@
+# raw data must never enter Git history
+data/raw/*
+!data/raw/.gitkeep
+data/state/*
+!data/state/.gitkeep
+data/demo_*/
+# large generated outputs (small ones such as the wide table and manifest are tracked)
+data/curated/case_level.csv
+data/curated/quarantine*.jsonl
+data/curated/_tmp/
+# python / tooling
+__pycache__/
+*.egg-info/
+.venv/
+.ipynb_checkpoints/
+build/
+dist/

@@ -1,0 +1,100 @@
+{
+  "cleaning_stats": {
+    "borough_imputed_from_zip": 0,
+    "borough_unresolved": 7,
+    "borough_zip_mismatch": 1048,
+    "complaint_type_case_normalized": 4602,
+    "descriptor_filled": 0,
+    "open_cases": 1244,
+    "zero_duration_cases": 49,
+    "zip_missing": 81,
+    "zip_not_in_population": 13,
+    "zip_nullified": 0
+  },
+  "code_version": {
+    "git_commit": "cfff099",
+    "package": "1.0.0"
+  },
+  "config": {
+    "agencies": [
+      "HPD"
+    ],
+    "batch_size": 50000,
+    "complaint_types": [
+      "HEAT/HOT WATER",
+      "UNSANITARY CONDITION",
+      "PLUMBING"
+    ],
+    "max_raw_records": null,
+    "max_retries": 5,
+    "min_raw_records": 300000,
+    "population_source": "https://api.census.gov/data/2022/acs/acs5",
+    "quarantine_max_ratio": 0.005,
+    "rate_per_residents": 10000,
+    "source": {
+      "kind": "socrata",
+      "method": "GET",
+      "url": "https://data.cityofnewyork.us/resource/erm2-nwe9.json"
+    },
+    "window_mode": "fixed"
+  },
+  "determinism_note": "run.* timestamps and git_commit are excluded from hashing; hashes cover data outputs.",
+  "http": {
+    "minimum_possible_requests": 14,
+    "rationale": "The server caps one response at 50000 rows, so 632912 raw records need at least ceil(632912/50000) = 13 data requests, plus 1 request for the population table. Keyset pagination needs no extra count/probe request: a short page signals the end. Anything above the minimum is retries or resumed runs.",
+    "retry_attempts_included": 0,
+    "total_http_requests": 16
+  },
+  "join": {
+    "matched_population": 632603,
+    "note": "many-to-one lookup on a unique ZIP key: row count must not change",
+    "population_zip_rows": 223,
+    "rows_after_join": 632697,
+    "rows_before_join": 632697,
+    "unmatched_population": 94
+  },
+  "output_hashes_sha256": {
+    "case_level.csv": "558dfe96d782c725a89773078498e2eb82e8b4fc658bddc66940d987c14558d1",
+    "data_quality_report.csv": "8292a937876f3d8ef2815eb1a155599bd5ccaba9f6aa9914aa2c1cf3c6108e6e",
+    "quarantine.jsonl": "23c7cd5f234483eb815c01314aa03cde89109a8cb1fbaaf55718de90dfe97e27",
+    "wide_borough_type_month.csv": "fe381fd63eb3dd9be5c187ae9d4f61279ad2bd21c004e1c8cce6502aba3a5bf3"
+  },
+  "population_source": {
+    "http_requests": 1,
+    "params": {
+      "for": "zip code tabulation area:*",
+      "get": "B01003_001E"
+    },
+    "retrieved_at": "2026-10-24T19:50:53Z",
+    "rows": 223,
+    "sha256": "3bcfb7483f45b23a2fbb2b55c5bf54d4f5cea0bf4047d4a62fcf4e17331de4d6",
+    "skipped_no_estimate": 0,
+    "source": "https://api.census.gov/data/2022/acs/acs5"
+  },
+  "records": {
+    "quarantine_by_reason": {
+      "CLOSED_BEFORE_CREATED": 215
+    },
+    "quarantined": 215,
+    "raw": 632912,
+    "raw_downloaded_total": 632912,
+    "valid": 632697
+  },
+  "run": {
+    "finished_at": "2026-10-24T20:31:10Z",
+    "started_at": "2026-10-24T20:30:48Z"
+  },
+  "window": {
+    "end_exclusive": "2024-07-01",
+    "mode": "fixed",
+    "scope_agencies": [
+      "HPD"
+    ],
+    "scope_complaint_types": [
+      "HEAT/HOT WATER",
+      "UNSANITARY CONDITION",
+      "PLUMBING"
+    ],
+    "start": "2023-01-01"
+  }
+}
