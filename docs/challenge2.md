@@ -46,13 +46,13 @@ $env:DATABASE_URL = "postgresql+psycopg://USER:PASSWORD@localhost:5432/DBNAME"
 Run the complete workflow from the repository root with one file:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\run_project.ps1
+powershell -ExecutionPolicy Bypass -File .\run_project_stage_2.ps1
 ```
 
 The script creates `.venv`, installs the project and test dependencies, runs the stage-one data pipeline, creates the challenge schema and loads both datasets, runs pytest, and executes the benchmark notebook. It needs internet access if stage one still needs to fetch source data. Use `-SkipBenchmark` to omit the benchmark notebook:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\run_project.ps1 -SkipBenchmark
+powershell -ExecutionPolicy Bypass -File .\run_project_stage_2.ps1 -SkipBenchmark
 ```
 `db-load` applies `sql/001_olist_schema.sql`, loads `data/curated/case_level.csv` using the stage-one package destination, and transactionally replaces Olist tables from `data/olist/`. It writes rejected source records to `data/state/olist_quarantine.jsonl`. When run directly, `db-load` requires the stage-one curated output to exist. The one-file runner creates or updates that output first, which can require internet/Census access.
 
@@ -63,7 +63,7 @@ from nyc311_factory.dashboard import read_dashboard
 sales_by_month = read_dashboard(1)
 ```
 
-Tests: `python -m pytest -q`. PostgreSQL integration tests use unique fixture rows in transactions and roll them back; without `DATABASE_URL` they are skipped. Full Olist reload/idempotency testing is separately gated by `TEST_DATABASE_URL`, whose database name must end in `_test`. For performance, run `notebooks/dba_benchmark.ipynb` or `python scripts/benchmark_postgres.py`. The runner captures baseline plans from `sql/000_dashboard_baseline.sql`, applies candidate indexes from `sql/003_performance_indexes.sql`, refreshes and compares the live aggregate view with its database snapshot, then sets Q1's source to the faster equal-result option and measures the five final dashboard statements. It also compares temporary insert cost with/without a seller index, reports index/table sizes and ratios, then drops the tested low-selectivity customer-state index via `sql/004_drop_ineffective_index.sql`. It writes `reports/performance_results.json`; that artifact is only available after successful execution.
+Tests: `python -m pytest -q`. PostgreSQL integration tests use unique fixture rows in transactions and roll them back; without `DATABASE_URL` they are skipped. Full Olist reload/idempotency testing is separately gated by `TEST_DATABASE_URL`, whose database name must end in `_test`. For performance, run `notebooks/dba_benchmark.ipynb` or `python scripts/benchmark_postgres.py`. The 200 ms target applies to each dashboard query separately; the runner reports the median PostgreSQL `EXPLAIN ANALYZE` execution time over seven measured runs after one warm-up, and records min/max and plans as well. Dashboard queries and the benchmark set session-level `work_mem` to 64 MB by default to limit disk-based sorts; override it with `NYC311_WORK_MEM` when needed, keeping in mind memory use can multiply across concurrent sessions and sort/hash operations. The runner captures baseline plans from `sql/000_dashboard_baseline.sql`, applies candidate indexes from `sql/003_performance_indexes.sql`, refreshes and compares the live aggregate view with its database snapshot, then sets Q1's source to the faster equal-result option and measures the five final dashboard statements. For the index-insensitive case, the artifact explicitly compares Q1's live view with no candidate indexes, the same view with candidate indexes, and the pre-aggregated snapshot. It records result equality, snapshot size and refresh duration, and flags whether indexes alone missed the target and whether the snapshot met it. If indexed Q1 already meets the budget, the report must identify another index-limited query or add a sixth case; the benchmark does not assume the special requirement has been demonstrated. It also compares temporary insert cost with/without a seller index, reports index/table sizes and ratios, then drops the tested low-selectivity customer-state index via `sql/004_drop_ineffective_index.sql`. It writes `reports/performance_results.json`; that artifact is only available after successful execution.
 
 ## Verification and acceptance
 
@@ -76,7 +76,7 @@ The current environment could not run Python: `.venv` points to a removed interp
 | Nine Olist tables, types, keys and checks | PARTIAL | DDL and explicit loader validation present; PostgreSQL behavior unverified. |
 | Olist loading and FK quarantine statistics | PARTIAL | Loader and JSONL report implemented; real counts require execution. |
 | Five live analytical reads | PARTIAL | SQL and SQLAlchemy live read present; not executed. |
-| Before/after budgets, plans, index use/write/size | PARTIAL | Repeatable benchmark runner/notebook present; no benchmark artifact yet. |
+| Before/after budgets, plans, index use/write/size | FAIL | First local run: Q1 passed at 8.636 ms using the snapshot; Q2–Q5 measured 571.445, 1,283.528, 2,458.333, and 1,919.737 ms. Updated `work_mem` and Q4 top-20 rewrite are not yet remeasured. |
 | Views/function/procedure/snapshot/idempotency | PARTIAL | DDL and DB integration tests present; not run. |
 | Six-plus data tests and stage-one suite | PARTIAL | Static checks and six PostgreSQL integration tests added; not run. |
 | Ten-minute notebook ceiling | PARTIAL | Notebook is ready, runtime unverified. |
