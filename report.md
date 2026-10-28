@@ -58,11 +58,25 @@ The monthly sales snapshot is derived from a live aggregate view and refreshed t
 
 Indexes are evaluated against query plans, measured reads, write overhead, and storage. This avoids treating every plausible index as beneficial: an index can speed a read while increasing insert cost and disk usage. No performance conclusion should be treated as measured until the benchmark has been run against a populated database.
 
+The challenge's performance budget is less than 200 ms for each of the five dashboard queries. The benchmark uses PostgreSQL's measured `EXPLAIN ANALYZE` execution time, excludes one warm-up, and reports the median of seven runs plus min/max and plans. It now calls out Q1 as the candidate index-insensitive aggregation and records the live view before and after candidate indexes, the pre-aggregated snapshot, result equality, snapshot storage, and refresh time. It also reports whether indexes alone missed the target and whether the snapshot met it. If real measurements show that Q1 meets the target with indexes, the benchmark flags that another query or a sixth case is needed to demonstrate the required index limitation. These are measurement procedures, not a claim that the 200 ms target has already been met.
+
 ## 4. Evidence and verification status
 
-The stage-one manifest previously recorded 632,912 fetched records and 632,603 population matches. The project report also records an earlier 49-test offline run and a comparison between the fetched row count and the sum of the selected API category counts. These are historical results from that recorded run, not results newly produced for this report. Reproducibility checks for exact memory use, repeated-run output hashes, and the precise normalization count were not available in the report materials and are not claimed here.
+The stage-one manifest previously recorded 632,912 fetched records and 632,603 population matches. The project report also records an earlier 49-test offline run and a comparison between the fetched row count and the sum of the selected API category counts. These are historical results from that recorded run, not new results from the DBA benchmark.
 
-The DBA implementation includes PostgreSQL integration tests, an Olist reload/idempotency test gated on a separate disposable test database, and a benchmark notebook. Those checks require a local PostgreSQL service, source data, and a configured connection. The current workspace has not run the database load, PostgreSQL integration tests, or benchmark; therefore this report makes no claim about their runtime behavior, measured query improvement, or real Olist load counts. The supplied challenge delivery guide was also not present in the repository, so compliance against that guide could not be independently assessed.
+The user ran the DBA benchmark against the populated local PostgreSQL database. Its first reported medians (server-side `EXPLAIN ANALYZE` execution time) were:
+
+| Query | Before candidate indexes | After indexes / selected dashboard source | Under 200 ms? |
+|---|---:|---:|---|
+| Q1 | 2,512.615 ms | 8.636 ms | Yes |
+| Q2 | 593.303 ms | 571.445 ms | No |
+| Q3 | 999.888 ms | 1,283.528 ms | No |
+| Q4 | 9,819.341 ms | 2,458.333 ms | No |
+| Q5 | 1,802.199 ms | 1,919.737 ms | No |
+
+For Q1, the indexed live view measured 2,478.860 ms, while the equivalent pre-aggregated snapshot measured 3.855 ms; the benchmark verified that the snapshot rows matched the live view. This demonstrates why indexes alone were insufficient for that full aggregation. The reported temporary insert comparison for 5,000 rows was 20.628 ms without the seller index and 65.700 ms with it; the benchmark includes the source SELECT in both measurements. These values describe the user's first benchmark run and are not a claim that the current query definitions meet the target.
+
+Plan inspection from that run found disk-based external merge sorts in Q2–Q5, spilling hash work in Q3 and Q4, and Q4 computing seller metrics for all sellers before returning the top 20. In response, the current implementation sets session-level `work_mem` to 64 MB by default for dashboard and benchmark connections, and rewrites Q4 to identify the top 20 sellers before calculating their delivery and review metrics. These changes have not yet been remeasured. The DBA integration tests and Olist reload/idempotency test still require their documented database conditions; no claim is made that those tests have run. The supplied challenge delivery guide was not present in the repository, so compliance against that guide could not be independently assessed.
 
 ## 5. Limitations and risks
 
@@ -70,13 +84,13 @@ The DBA implementation includes PostgreSQL integration tests, an Olist reload/id
 - ZIP-prefix mapping to borough is an approximation. Census ACS 2022 population estimates remain fixed across the selected 18-month complaint period.
 - Recent complaint periods contain right-censored cases: open cases have not had the same time to resolve as older cases. Comparisons should account for this.
 - Olist source files and a working PostgreSQL database are prerequisites for end-to-end verification. Database integration tests should use a separate disposable database where destructive reload tests are enabled.
-- Benchmark outcomes depend on the local PostgreSQL version, data volume, indexes, and machine. No index or snapshot speedup is asserted without a recorded run.
+- Benchmark outcomes depend on the local PostgreSQL version, data volume, indexes, memory, and machine. The first benchmark run did not meet the 200 ms target for Q2–Q5; the latest work_mem and Q4 query changes need a fresh run before their effect can be claimed.
 
 ## 6. How I would defend the main trade-offs
 
 If asked why the system is not a single script that downloads and transforms everything in memory, I would point to restartability and the ability to inspect raw, curated, and quarantined records independently. If asked why the database enforces constraints when the loader already validates data, I would explain that loader checks provide useful rejection reports while database constraints protect the stored state from other writers and future code paths. If asked why the results are scoped to three complaint types, I would explain that the scope was chosen from API counts and avoids a biased first-N cutoff, while acknowledging that it excludes other complaint categories.
 
-For the DBA work, I would distinguish implemented design from verified behavior. The schemas, loader, queries, constraints, refresh procedure, and tests provide a concrete implementation to review. A successful local database load, a full test run, and benchmark output are still required before claiming operational validation or performance gains.
+For the DBA work, I would distinguish implemented design from verified behavior. The schemas, loader, queries, constraints, refresh procedure, and tests provide a concrete implementation to review. The first benchmark measured Q1 below budget through its snapshot but showed Q2–Q5 failing; the follow-up work is to rerun that benchmark and verify the updated `work_mem` and Q4 query. A full integration-test run is still needed before claiming complete operational validation.
 
 ## 7. AI usage and my role
 
