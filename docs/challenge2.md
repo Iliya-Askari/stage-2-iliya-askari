@@ -37,21 +37,24 @@ The five statements are in `sql/002_dashboard_queries.sql`; `nyc311_factory.dash
 
 ## Setup and execution
 
-Install Python 3.11+ and PostgreSQL, then from the repository root:
+Install Python 3.11+ and a local PostgreSQL server. Create an empty database (for example, `createdb nyc311`) and place the nine Olist CSV source files in `data/olist/`. Then set the connection URL in PowerShell:
 
 ```powershell
-python -m venv .venv
-. .venv/Scripts/Activate.ps1
-python -m pip install -e ".[test]"
-$env:DATABASE_URL = "postgresql+psycopg://USER:PASSWORD@HOST:5432/DB"
-nyc311 db-load
+$env:DATABASE_URL = "postgresql+psycopg://USER:PASSWORD@localhost:5432/DBNAME"
 ```
 
-With Docker Desktop, the full local path can be started with one script: copy `.env.example` to `.env`, change the password, then run `./scripts/run_dba.ps1`. It starts PostgreSQL 16, installs the package, loads both datasets, runs tests and executes the benchmark notebook. It expects stage one's curated output to already exist. The optional full Olist idempotency test requires a separate disposable database whose name ends in `_test`; set `TEST_DATABASE_URL` only for that database.
+Run the complete workflow from the repository root with one file:
 
-With Docker Desktop, the full local path can be started with one script: copy `.env.example` to `.env`, change the password, then run `./scripts/run_dba.ps1`. It starts PostgreSQL 16, installs the package, loads both datasets, runs tests and executes the benchmark notebook. It expects stage one's curated output to already exist. The optional full Olist idempotency test requires a separate disposable database whose name ends in `_test`; set `TEST_DATABASE_URL` only for that database.
+```powershell
+powershell -ExecutionPolicy Bypass -File .\run_project.ps1
+```
 
-`db-load` applies `sql/001_olist_schema.sql`, loads `data/curated/case_level.csv` using the stage-one package destination, and transactionally replaces Olist tables from `data/olist/`. It writes rejected source records to `data/state/olist_quarantine.jsonl`. The existing stage-one curated output must be present; rebuilding it can require network/Census access.
+The script creates `.venv`, installs the project and test dependencies, runs the stage-one data pipeline, creates the challenge schema and loads both datasets, runs pytest, and executes the benchmark notebook. It needs internet access if stage one still needs to fetch source data. Use `-SkipBenchmark` to omit the benchmark notebook:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\run_project.ps1 -SkipBenchmark
+```
+`db-load` applies `sql/001_olist_schema.sql`, loads `data/curated/case_level.csv` using the stage-one package destination, and transactionally replaces Olist tables from `data/olist/`. It writes rejected source records to `data/state/olist_quarantine.jsonl`. When run directly, `db-load` requires the stage-one curated output to exist. The one-file runner creates or updates that output first, which can require internet/Census access.
 
 For a live read:
 

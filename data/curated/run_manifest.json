@@ -12,7 +12,7 @@
     "zip_nullified": 0
   },
   "code_version": {
-    "git_commit": "cfff099",
+    "git_commit": "6d85efe",
     "package": "1.0.0"
   },
   "config": {
@@ -81,8 +81,8 @@
     "valid": 632697
   },
   "run": {
-    "finished_at": "2026-10-24T20:31:10Z",
-    "started_at": "2026-10-24T20:30:48Z"
+    "finished_at": "2026-10-28T21:41:44Z",
+    "started_at": "2026-10-28T21:41:31Z"
   },
   "window": {
     "end_exclusive": "2024-07-01",

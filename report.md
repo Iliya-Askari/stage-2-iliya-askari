@@ -1,54 +1,85 @@
-# گزارش «دلیل حل» — چالش ۱: کارخانه داده
-(من توضیحاتی و دلایلم رو به هوش مصنوعی گفتم و تصمیم هام رو گفتم برای ساخت و فرمت بندی دقیق تر این متن رو هوش مصنوعی گفتم نسبت به توضیحات من نوشته و از هوش مصنوعی کلاد رایگان استفاده شده و دلیل اینکه کامیت ها یکدفعه و در اخر تایم زده شده من به یک ورژن پایدار و سالم رسیدم و به صورت تمیز تر و سالم تر رسیدم درسته این اشتباهه ولی حتما در چالش دوم لحاظ میکنم خیلی حرفه ای و دقیق پیاده سازی بکنم)
-> قبل از تحویل: هر `‹…›` رو با عدد واقعی از `data/curated/run_manifest.json` یا خروجی نوتبوک پر کن و این خط راهنما رو پاک کن. اعدادی که بدون `‹›` نوشتم از اجرای واقعی خودت اومده (شمارش‌های API و خروجی `verify_stage1.py`).
+# Design Rationale and Project Defense
 
-## ۰. روش انجام پروژه و نقش من در تصمیم‌های فنی
-از هوش مصنوعی به‌عنوان ابزار کمکی برای طراحی معماری، نوشتن کد، تست‌ها و نوتبوک استفاده کردم. این‌ها رو دستیار نوشته و من از صفر خودم پیاده‌سازی نکردم. ولی هدفم فقط یه خروجی قابل تحویل نبود؛ می‌خواستم منطق هر مرحله رو بفهمم و بتونم از تصمیم‌ها دفاع کنم. روش کارم این بود:
+## 1. Executive summary
 
-1. **قیدها رو من مشخص کردم.** دو پی‌دی‌اف رو بهش دادم و خواستم مرحله‌به‌مرحله و با توضیح دلیل هر قدم جلو بره. قیدهای مهم: دریافت داده از اعتبارسنجی و نوشتن جدا باشه (چون مرحله‌های ۲ و ۳ روی همین پکیج سوارن)، تنظیمات بیرون از کد باشه، و تست‌ها بدون اینترنت اجرا بشن.
-2. **گزینه‌ها و دلیلشون رو پرسیدم، بعد با اجرای واقعی سنجیدم.** مثلاً اول کل HPD رو گرفتم (۱٬۰۵۰٬۶۲۹ رکورد)، بعد شمارش هر نوع شکایت رو از API درآوردم، پرسیدم چرا نمی‌شه فقط ۳۰۰ هزار رکورد گرفت، و دامنه رو بعد از دیدن اعداد محدود کردم (تصمیم ۱).
-3. **خطاها و خروجی‌ها رو خودم دنبال کردم.** خطای ۴۰۳ و خرابی تست روی Windows رو گزارش دادم و بعد از هر اصلاح دوباره اجرا کردم. درستی نتیجه‌ها رو هم خودم چک کردم: مثلاً `raw` دقیقاً با جمع شمارش‌های API برابر شد.
-4. **سه چیز رو توی گزارش جدا نگه داشتم:** کدی که تولید شد، نتیجه‌ای که واقعاً اجرا شد، و دلیلی که برای هر انتخاب دارم. جاهایی که تأیید نشدن یا ریسک دارن توی بخش ۴ و ۳ اومدن.
+This project combines a repeatable NYC 311 data pipeline with a PostgreSQL analytics layer for the Olist marketplace dataset. The design favors explicit data contracts, restartable ingestion, traceable data quality decisions, and database constraints that make invalid states harder to store. It keeps raw inputs, curated outputs, operational loading, and analytical queries distinct so that each stage can be inspected and rerun.
 
-## ۱. مسئله، فرضیات و تعریف‌ها
-مسئله رو این‌طوری می‌فهمم: از API زنده‌ی ۳۱۱ نیویورک یه dataset تمیز بسازم که بدونه چی رو دور انداخته و چرا، و دوباره اجرا که بشه نه تکراری بسازه نه داده‌ی سالم رو از دست بده.
+The implementation follows the project requirements and technical direction I provided. I used OpenAI Codex to generate and revise most of the implementation, tests, SQL, and supporting documentation. I directed the scope and priorities, evaluated proposed trade-offs, requested changes, and reviewed the resulting artifacts. This is an AI-assisted implementation; I do not present every line of code as independently authored by me. I am responsible for explaining the design and for distinguishing verified results from work that still needs to be run.
 
-- **بازه:** ۲۰۲۳-۰۱-۰۱ تا ۲۰۲۴-۰۷-۰۱ (۱۸ ماه، انتهاش بازه نیست). **دامنه:** آژانس HPD و سه نوع شکایت (تصمیم ۱ پایین).
-- **منطقه** = borough. جمعیت منطقه = جمع جمعیت ZIPهایی که با پیشوند سه‌رقمی بهش نگاشت می‌شن.
-- **منبع دوم:** Census ACS 5-year سال ۲۰۲۲ (جدول B01003، سطح ZCTA)، از `api.census.gov`. تاریخ دریافت توی `run_manifest.json` (کلید `population_source.retrieved_at`) ثبته: `‹تاریخ›`.
-- **رکورد تکراری:** `unique_key` یکسان؛ اولین نمونه می‌مونه. **رکورد نامعتبر:** هر رکوردی که قرارداد (`docs/data_contract.md`) رو بشکنه و قابل اصلاح نباشه، مثل بسته‌شدن قبل از ثبت. ZIP خراب نامعتبر حساب نمی‌شه، فقط خالی می‌شه.
-- **چرا GET و POST:** GET برای خوندنِ بدون‌اثر با پارامتر توی URL خوبه و Socrata برای خوندن همین رو می‌خواد؛ روی اون endpoint، POST یعنی نوشتن/upsert. API‌هایی که کوئری بزرگ یا پیچیده می‌گیرن معمولاً بدنه‌ی POST می‌خوان. هر دو رو توی لایه‌ی HTTP پیاده‌سازی و تست کردم (`test_http_client`).
+## 2. Problem definition
 
-## ۲. تصمیم‌های کلیدی
-**۱) دامنه: HPD + سه نوع شکایت.** گزینه‌ها: کل HPD (۱٬۰۵۰٬۶۲۹ رکورد در این بازه طبق `count(*)` روی API)، قطع دانلود روی N رکورد اول، یا فیلتر روی نوع شکایت. قطع روی N رکورد رد شد چون `unique_key` تقریباً ترتیب زمانیه و فقط چند ماه اول رو می‌داد. انتخاب: HEAT/HOT WATER و UNSANITARY CONDITION و PLUMBING، هر کدوم با احتساب املای متفاوت (۳۶۴٬۳۰۳ + ۱۷۳٬۳۳۳ + ۹۵٬۲۷۶). شاهد: `raw = 632,912` دقیقاً همین جمع شد (manifest، `records.raw`). از دست دادم: ۱۰ نوع دیگه‌ی شکایت (حدود ۴۱۷ هزار رکورد) و تعمیم به کل HPD. معیار توی `config/default.json` و manifest ثبته.
+The first stage collects a bounded set of NYC 311 complaints, enriches them with Census population data, validates them against a data contract, and produces reusable curated outputs. The second stage adds PostgreSQL schemas for the curated factory data and Olist marketplace data, validates and loads the source CSVs, and provides five analytical queries plus database-side support for refreshable aggregates and performance comparisons.
 
-**۲) صفحه‌بندی keyset (`unique_key > آخرین`) به‌جای offset.** با offset، اگه وسط دانلود داده‌ی جدید وارد بشه صفحه‌ها جابه‌جا می‌شن، و ازسرگیری هم به شماره‌ی دقیق صفحه وابسته‌ست. با keyset فقط یه cursor توی checkpoint می‌مونه. شاهد: تست `test_resume_after_network_failure...` و ۱۶ درخواست واقعی در برابر حداقل ۱۴ (۱۳ صفحه‌ی داده + ۱ درخواست Census؛ manifest، بخش `http`). دو درخواست اضافه احتمالاً مال همون تلاش‌های ناموفق ۴۰۳ بود که checkpoint جمع می‌کنه. محدودیتش: رکوردی که بعد از رد شدن cursor با `unique_key` کوچک‌تر وارد بشه گرفته نمی‌شه، و پرونده‌هایی که قبلاً گرفتم و بعداً بسته می‌شن به‌روز نمی‌شن. از دست دادم: امکان گرفتن موازی صفحه‌ها.
+The main engineering concerns are reproducibility, partial failures during ingestion, source quality, preservation of identifiers and monetary values, referential integrity, and clear definitions for analytical metrics. The design choices below address those concerns while keeping the project operable as a small local pipeline.
 
-**۳) هر دسته یه فایل JSONL اتمیک، و checkpoint بعد از نوشتن فایل.** گزینه‌ها: همه‌چی توی حافظه، یه فایل بزرگ، فایل به‌ازای دسته. اگه وسط کار قطع بشه، بدترین حالت اینه که یه دسته دوباره با همون اسم و همون محتوا نوشته بشه، پس اجرا idempotent می‌مونه. شاهد حافظه: `scripts/measure_memory.py` → حجم خام `‹…› MB` در برابر قله‌ی حافظه `‹…› MB`. شاهد ازسرگیری: بعد از `--max-batches 3` و اجرای دوباره، هش‌ها با اجرای کامل `‹یکسان بود؟›`. از دست دادم: سرعت (سریال‌سازی JSON) و فضای دیسک.
+## 3. Why the project is structured this way
 
-**۴) قرنطینه با کد دلیل و آستانه‌ی ۰٫۵٪.** گزینه‌ها: حذف بی‌صدا، پاک‌سازی همه‌چی، قرنطینه. نتیجه‌ی واقعی: ۲۱۵ رکورد از ۶۳۲٬۹۱۲ (۰٫۰۳۴٪) قرنطینه شد و همه‌شون یه دلیل داشتن: `CLOSED_BEFORE_CREATED`. آستانه‌ی ۰٫۵٪ حدود ۱۵ برابر نرخ واقعیه: اون‌قدر بالاست که نوسان معمولی ردش نکنه و اون‌قدر پایینه که اگه API خراب بشه (مثلاً یه ستون تاریخ فرمتش عوض بشه) اجرا متوقف بشه. از دست دادم: نمی‌تونم بگم این ۲۱۵ تا واقعاً خطای ثبت بودن یا فقط ساعتشون اشتباهه.
+### 3.1 Separate pipeline stages behind a Python package
 
-**۵) سیاست مقدار خالی برای هر ستون جدا، و یکسان‌سازی حروف نوع شکایت.** `closed_date` خالی یعنی پرونده بازه (می‌مونه، مدتش null)؛ ZIP جعلی (`00000`، `N/A`) → null؛ borough نامشخص از روی ZIP پر می‌شه؛ فیلدهای کلیدی خالی → قرنطینه. API هم نوع شکایت رو با دو املا برمی‌گردونه (`WATER LEAK` با ۶۷٬۶۶۶ رکورد و `Water Leak` با ۳٬۰۷۷)، پس همه رو به حروف بزرگ تبدیل کردم، وگرنه جدول عریض یه نوع رو دو ردیف می‌کرد. شاهد: این تغییر توی سه نوع انتخابی ۴٬۶۰۲ رکورد رو درست کرد (۱٬۸۱۴ + ۱٬۲۶۳ + ۱٬۵۲۵ طبق شمارش API؛ باید با `cleaning_stats.complaint_type_case_normalized` بخونه: `‹…›`). از دست دادم: وفاداری ۱۰۰٪ به متن خام (خام توی `data/raw` سالمه).
+The NYC 311 workflow is implemented as the `nyc311_factory` package under `src/nyc311_factory`, with separate modules for configuration, fetching, curation, validation, storage, and PostgreSQL loading. This keeps network access and transformation logic out of the command-line entry point and gives each stage a focused interface.
 
-**۶) قطعیت (determinism).** خروجی‌ها مرتب، با قالب‌بندی ثابت (اعشار با تعداد رقم ثابت، `\n` به‌جای CRLF) و بدون زمان نوشته می‌شن؛ زمان و commit فقط توی manifest ان که از هش بیرونه. شاهد: هش `case_level.csv` توی اجرای اول با `558dfe96d782` شروع می‌شد (manifest، بخش `output_hashes_sha256`)؛ توی اجرای دوم و بعد از قطع و ادامه: `‹یکسان بود؟›`. از دست دادم: راحتیِ نوشتن خروجی با ابزارهای آماده مثل `to_csv`، چون قالب‌بندی رو باید خودم کنترل کنم.
+The package structure was chosen so that later stages can reuse the canonical curated output without copying or reimplementing the stage-one transformations. It also makes unit testing possible without requiring a live API for every test. Configuration is stored outside the implementation, allowing date ranges and source settings to change without editing pipeline code.
 
-## ۳. چیزهایی که شکست خوردن
-- **اجرای اول با کل HPD.** ۱٫۰۵ میلیون رکورد گرفتم و کار کرد، ولی وقتی شمارش هر نوع شکایت رو از API دیدم فهمیدم یه نوع دو املا داره و پایپ‌لاین اون روز یکی‌شون نمی‌کرد. اون مسیر رو کنار گذاشتم و دامنه رو محدود کردم و حروف رو یکسان کردم (تصمیم ۱ و ۵).
-- **فیلتر `upper()` توی کوئری API.** برای گرفتن هر دو املا از `upper(complaint_type) in (...)` استفاده کردم و API یه صفحه‌ی HTML با ۴۰۳ داد (نه خطای معمولی JSON). من خطا رو گزارش دادم و دستیار حدس زد دروازه‌ی امنیتی سرور تابع توی کوئری رو مشکوک دونسته؛ ۱۰۰٪ ثابت نشد چون ممکن بود محدودیت نرخ باشه. به‌جاش املاهای ممکن رو صریح فرستادم (`'HEAT/HOT WATER','Heat/Hot Water'`) و درست شد.
-- **تست مسیر مطلق روی Windows.** یه تست انتظار داشت `/abs/path` مطلق حساب بشه؛ روی ماشین من خراب شد چون روی Windows بدون درایو مطلق نیست. دستیار تابعی نوشت که مسیر مطلق رو برای هر دو سیستم تشخیص بده و من دوباره تست‌ها رو اجرا کردم.
+### 3.2 Preserve raw inputs and make downloads restartable
 
-## ۴. محدودیت‌ها و ریسک‌ها
-- **منبع زنده ثابت نیست.** پرونده‌ی بازی که بین دو دانلود مستقل بسته بشه، خروجی رو عوض می‌کنه. برای همین دانلود خام کش می‌شه و بازتولید روی همون خامه، نه روی API.
-- ستون‌های nullable (مثل `closed_date`) رو فقط آخر دانلود برای ناپدیدشدن چک می‌کنم، چون API مقدار null رو اصلاً نمی‌فرسته.
-- نگاشت ZIP به borough با پیشوند سه‌رقمیه و تقریبیه (بعضی ZIPهای `110xx` بیرون NYC‌ان). ناسازگاری‌ها توی `borough_mismatch` گزارش می‌شن: `‹…›` رکورد.
-- جمعیت ثابته (ACS ۲۰۲۲) برای هر ۱۸ ماه؛ نرخ‌ها تغییر جمعیت رو نمی‌گیرن.
-- `status` فقط «غیرخالی» بررسی می‌شه، پس مقدار جدید پذیرفته می‌شه. اگه API ستونی رو حذف کنه یا نوعش عوض بشه، با `SchemaDriftError` (کد خروج ۴) می‌ایسته.
-- پرونده‌های بازِ ماه‌های آخر سانسور راست‌گرا دارن، و روند «بهتر/بدتر» رو گمراه می‌کنن (نوتبوک، بخش ۷).
+The fetcher uses keyset pagination on `unique_key` and persists each batch before advancing its checkpoint. This was selected over offset pagination because offsets can shift when records are inserted while a long download is in progress, and because a saved cursor is a simple restart point after a network interruption. Batch output is written atomically so an interruption does not leave a partially written batch presented as complete.
 
-## ۵. اگه دو روز دیگه وقت داشتم
-اول Sink پایگاه‌داده (PostgreSQL) پشت همون interface خروجی می‌ساختم چون مرحله ۲ بهش نیاز داره؛ بعد `:updated_at` رو می‌گرفتم تا رکورد‌ها نسخه داشته باشن و تعریف «تکراری» بهتر بشه، صفحه‌ها رو کنترل‌شده موازی می‌گرفتم، و تست خودکار مصرف حافظه می‌نوشتم.
+The bounded stage-one scope is HPD complaints from 2023-01-01 through 2024-07-01 for three selected complaint types. The recorded API counts were 364,303 for HEAT/HOT WATER, 173,333 for UNSANITARY CONDITION, and 95,276 for PLUMBING, summing to 632,912. A fixed limit on the first N records was rejected because the API ordering would bias the result toward earlier records rather than produce a representative scope. The trade-off is that the result does not cover all HPD complaints or all complaint types.
 
-## AI usage
-**دستیار انجام داد:** طراحی معماری، کد پکیج، تست‌ها، نوتبوک، اسکریپت بررسی (`verify_stage1.py`) و پیش‌نویس این گزارش؛ همچنین حدس علت ۴۰۳، رفع باگ مسیر Windows و پیشنهاد آستانه‌ی قرنطینه و یکسان‌سازی حروف.
-**من انجام دادم:** تعیین هدف و قیدها از روی پی‌دی‌اف‌ها، گرفتن کلید Census و شمارش‌های API، پذیرفتن دامنه‌ی نهایی بعد از دیدن اعداد، و اجرای همه‌چی روی ماشین خودم.
-**بررسی‌های خودم:** ۴۹ تست آفلاین، `verify_stage1.py`، مقایسه‌ی `raw` با جمع شمارش‌های API (۶۳۲٬۹۱۲ هر دو)، مقایسه‌ی هش‌ها بین اجراها `‹…›` و اجرای نوتبوک از اول تا آخر. `‹هر چیز دیگه‌ای که خودت واقعاً تغییر دادی یا بررسی کردی›`
+### 3.3 Make data-quality decisions visible
+
+Curated data follows an explicit contract. Invalid records are quarantined with reason codes rather than silently discarded. Values are normalized only where the analytical contract calls for it: complaint type casing is unified, invalid ZIP values are treated as missing, and an unknown borough may be inferred from ZIP mapping. Raw source data remains available for audit and reprocessing.
+
+This approach favors recoverability and explainability over making every source row look complete. In the recorded stage-one run, 215 of 632,912 rows were quarantined for `CLOSED_BEFORE_CREATED` (about 0.034%). The configured 0.5% threshold is a guard against unusually high rejection rates; it allows observed low-level anomalies while halting on likely source or schema changes. The rejected records are still a limitation: the source does not establish whether each timestamp inversion is a genuine data error or a clock-entry issue.
+
+### 3.4 Use database schemas to express ownership and constraints
+
+The PostgreSQL layer separates `olist`, `factory`, and `analytics` schemas. This makes data ownership clear and prevents source tables, stage-one outputs, and derived analytical objects from becoming one undifferentiated namespace. The stage-one destination is part of the existing package so its output contract has one implementation and one load path.
+
+Tables use primary keys and foreign keys where the source supports a reliable business key. Checks enforce domain rules such as nonnegative amounts and dimensions, valid review scores, positive item numbers, and sensible timestamp order. Geolocation does not receive an invented unique key because repeated ZIP prefixes and coordinates are legitimate in that source. Customer unique IDs are also not treated as a customer-table key because the source represents repeat customers across multiple customer records.
+
+Identifiers and ZIP prefixes remain text to preserve leading zeroes and avoid accidental numeric interpretation. Monetary values use `numeric(12,2)` and are parsed through `Decimal`, avoiding binary floating-point rounding for currency. Source timestamps do not include a timezone, so they are stored as `timestamp without time zone`; assigning a timezone would imply information that the CSV does not provide.
+
+### 3.5 Validate before inserting and quarantine rejected source rows
+
+The Olist loader converts and validates records before loading them, checks duplicates and foreign-key relationships, and records rejected source rows in JSONL quarantine with reasons. The replacement load is transactional so a failed load does not leave a partly refreshed set of tables. This is more work than relying on a permissive bulk import, but it makes the accepted and rejected records auditable and protects referential integrity.
+
+Nullable product and seller references on order items reflect the source and loading policy; the order relationship itself remains required. This avoids discarding an otherwise useful order item solely because its optional catalog reference is absent. The loader still reports such data quality issues rather than silently changing identifiers.
+
+### 3.6 Put analytical definitions in SQL and document metric limits
+
+The five dashboard queries are maintained in SQL and exposed through a small Python read interface. SQL keeps joins, aggregation, and filtering close to the database, where the data resides, and makes the analytical definitions reviewable without tracing application code.
+
+The metrics state their scope explicitly. For example, item price is treated as merchandise GMV, not recognized net revenue, because there is no refund or reversal ledger. Delivery calculations exclude records missing required dates. Satisfaction comparisons are descriptive associations, not causal claims. Orders that use multiple payment/installment combinations may contribute to more than one group, so those group totals cannot be summed as unique marketplace revenue.
+
+### 3.7 Use a snapshot only as a refreshable optimization
+
+The monthly sales snapshot is derived from a live aggregate view and refreshed transactionally by month. The refresh validates month boundaries and takes an advisory transaction lock for that month. This allows safe repeated refreshes without making the snapshot a separate, hand-maintained source of truth. The dashboard can use either the live view or snapshot; the benchmark is designed to compare their results before selecting the faster option.
+
+Indexes are evaluated against query plans, measured reads, write overhead, and storage. This avoids treating every plausible index as beneficial: an index can speed a read while increasing insert cost and disk usage. No performance conclusion should be treated as measured until the benchmark has been run against a populated database.
+
+## 4. Evidence and verification status
+
+The stage-one manifest previously recorded 632,912 fetched records and 632,603 population matches. The project report also records an earlier 49-test offline run and a comparison between the fetched row count and the sum of the selected API category counts. These are historical results from that recorded run, not results newly produced for this report. Reproducibility checks for exact memory use, repeated-run output hashes, and the precise normalization count were not available in the report materials and are not claimed here.
+
+The DBA implementation includes PostgreSQL integration tests, an Olist reload/idempotency test gated on a separate disposable test database, and a benchmark notebook. Those checks require a local PostgreSQL service, source data, and a configured connection. The current workspace has not run the database load, PostgreSQL integration tests, or benchmark; therefore this report makes no claim about their runtime behavior, measured query improvement, or real Olist load counts. The supplied challenge delivery guide was also not present in the repository, so compliance against that guide could not be independently assessed.
+
+## 5. Limitations and risks
+
+- The NYC 311 API is mutable. A record added behind a saved keyset cursor may be missed, and records already downloaded may later change status. The raw cache makes curation repeatable for a fixed input, but does not make the live source immutable.
+- ZIP-prefix mapping to borough is an approximation. Census ACS 2022 population estimates remain fixed across the selected 18-month complaint period.
+- Recent complaint periods contain right-censored cases: open cases have not had the same time to resolve as older cases. Comparisons should account for this.
+- Olist source files and a working PostgreSQL database are prerequisites for end-to-end verification. Database integration tests should use a separate disposable database where destructive reload tests are enabled.
+- Benchmark outcomes depend on the local PostgreSQL version, data volume, indexes, and machine. No index or snapshot speedup is asserted without a recorded run.
+
+## 6. How I would defend the main trade-offs
+
+If asked why the system is not a single script that downloads and transforms everything in memory, I would point to restartability and the ability to inspect raw, curated, and quarantined records independently. If asked why the database enforces constraints when the loader already validates data, I would explain that loader checks provide useful rejection reports while database constraints protect the stored state from other writers and future code paths. If asked why the results are scoped to three complaint types, I would explain that the scope was chosen from API counts and avoids a biased first-N cutoff, while acknowledging that it excludes other complaint categories.
+
+For the DBA work, I would distinguish implemented design from verified behavior. The schemas, loader, queries, constraints, refresh procedure, and tests provide a concrete implementation to review. A successful local database load, a full test run, and benchmark output are still required before claiming operational validation or performance gains.
+
+## 7. AI usage and my role
+
+I used OpenAI Codex as the primary implementation assistant. Codex generated and revised most of the Python modules, SQL, tests, scripts, and report wording under my direction. I supplied the project requirements and constraints, chose the requested scope and workflow, asked for explanations of design options, reviewed the proposed changes, and steered revisions when behavior or documentation needed to change. I used the resulting work as an implementation to inspect and defend; I do not claim that I manually authored every line or independently executed the unrun DBA checks.
+
+The responsibility for the submitted work remains mine. I should be able to explain the decisions in this report, identify which evidence is historical versus newly verified, and run the outstanding database checks before presenting them as completed results. AI assistance does not replace that responsibility.

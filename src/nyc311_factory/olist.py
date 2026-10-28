@@ -9,7 +9,7 @@ import hashlib
 from pathlib import Path
 
 import pandas as pd
-from sqlalchemy import create_engine, text
+from sqlalchemy import MetaData, Table, create_engine, text
 
 from .exceptions import ConfigError
 
@@ -216,7 +216,26 @@ def load_olist(data_dir="data/olist", url=None, quarantine_path="data/state/olis
             counts={}
             for key in order:
                 f=frames[key][COLUMNS[key]].copy()
-                f.to_sql(key,conn,schema="olist",if_exists="append",index=False,chunksize=chunksize,method="multi")
+                # Bind against the real PostgreSQL column types. pandas.to_sql infers
+                # Decimal object columns as VARCHAR, which PostgreSQL may reject for
+                # NUMERIC columns such as order_items.price and payments.value.
+                table=Table(key,MetaData(),schema="olist",autoload_with=conn)
+                for start in range(0,len(f),chunksize):
+                    batch=f.iloc[start:start+chunksize]
+                    records=[]
+                    for record in batch.to_dict(orient="records"):
+                        typed_record={}
+                        for column,value in record.items():
+                            if pd.isna(value):
+                                value=None
+                            elif isinstance(value,pd.Timestamp):
+                                value=value.to_pydatetime()
+                            elif hasattr(value,"item") and not isinstance(value,(str,bytes,Decimal)):
+                                value=value.item()
+                            typed_record[column]=value
+                        records.append(typed_record)
+                    if records:
+                        conn.execute(table.insert(),records)
                 counts[key]=len(f)
             # Snapshot is derived data. Rebuild all populated purchase months in this
             # same transaction so readers never observe a half-refreshed load.
