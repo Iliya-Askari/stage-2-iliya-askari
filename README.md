@@ -1,12 +1,12 @@
-# راهنمای اجرای پروژه
+# Project Setup and Run Guide
 
-این پروژه شامل pipeline مربوط به داده‌های NYC 311 و لایهٔ تحلیلی PostgreSQL برای داده‌های Olist است. برای اجرای کامل روی Windows به Python 3.11 یا جدیدتر، PostgreSQL محلی، اتصال اینترنت، و ۹ فایل CSV منبع Olist نیاز دارید.
+This project contains the NYC 311 data pipeline and a PostgreSQL analytics layer for the Olist dataset. To run the full workflow on Windows, you need Python 3.11 or later, a local PostgreSQL server, an internet connection, and the nine Olist source CSV files.
 
-## مرحلهٔ اول: دریافت داده‌های Olist
+## Step 1: Download the Olist data
 
-1. مجموعه‌دادهٔ Olist را از [صفحهٔ Kaggle: Brazilian E-Commerce Public Dataset by Olist](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce?resource=download) دانلود کنید. برای دانلود ممکن است لازم باشد وارد حساب Kaggle شوید.
-2. فایل ZIP دانلودشده را استخراج کنید.
-3. این ۹ فایل CSV را مستقیماً داخل پوشهٔ `data/olist/` پروژه کپی کنید؛ آن‌ها را داخل یک زیرپوشهٔ اضافه قرار ندهید:
+1. Download the dataset from the [Kaggle page: Brazilian E-Commerce Public Dataset by Olist](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce?resource=download). You may need to sign in to Kaggle.
+2. Extract the downloaded ZIP file.
+3. Copy these nine CSV files directly into the project's `data/olist/` directory. Do not put them inside an additional subfolder:
 
 ```text
 data/olist/olist_customers_dataset.csv
@@ -20,62 +20,58 @@ data/olist/olist_order_reviews_dataset.csv
 data/olist/olist_geolocation_dataset.csv
 ```
 
-پس از کپی، مسیر هر فایل باید دقیقاً مانند بالا باشد. فایل ZIP را داخل `data/olist/` نگه ندارید؛ loader به خود فایل‌های CSV نیاز دارد.
+Each file must be at the exact path shown above. Do not leave only the ZIP file in `data/olist/`; the loader needs the extracted CSV files.
 
-## پیش‌نیازها
+## Prerequisites
 
-1. Python 3.11+ را نصب کنید و مطمئن شوید دستور `python` در PowerShell در دسترس است.
-2. PostgreSQL 18 را نصب و سرویس آن را اجرا کنید. اگر PostgreSQL در مسیر پیش‌فرض نصب شده، پوشهٔ `bin` را به `PATH` اضافه کنید:
+1. Install Python 3.11 or later and make sure `python` is available in PowerShell.
+2. Install PostgreSQL 18 and start its service. If PostgreSQL is installed in the default location, add its `bin` directory to `PATH`:
 
 ```powershell
 $env:Path += ";C:\Program Files\PostgreSQL\18\bin"
 ```
 
-3. در ریشهٔ پروژه دیتابیس خالی `stage1` را بسازید. دستور `createdb` در صورت نیاز رمز کاربر postgres را می‌پرسد:
+3. From the project root, create an empty database named `stage1`. The `createdb` command may prompt for the `postgres` user's password:
 
 ```powershell
 createdb -h localhost -U postgres stage1
 ```
 
-4. آدرس اتصال دیتابیس را برای همین نشست PowerShell تنظیم کنید. `YOUR_PASSWORD` را با رمز PostgreSQL جایگزین کنید:
+4. Set the database connection URL in the current PowerShell session. Replace `YOUR_PASSWORD` with your PostgreSQL password:
 
 ```powershell
 $env:DATABASE_URL = "postgresql+psycopg://postgres:YOUR_PASSWORD@localhost:5432/stage1"
 ```
 
-اگر رمز شما نویسه‌هایی مثل `@`, `:`, `/` یا `#` دارد، آن‌ها را در URL به‌شکل percent-encoded بنویسید.
+If the password contains URL-reserved characters such as `@`, `:`, `/`, or `#`, percent-encode them in the URL.
 
-## اجرای مراحل بعد
+## Run the complete workflow with one file
 
-PostgreSQL باید فعال باشد، دیتابیس خالی `stage1` ساخته شده باشد و `DATABASE_URL` در همان نشست PowerShell تنظیم شده باشد. سپس اجرای کامل را شروع کنید.
-
-## اجرای کامل با یک فایل
-
-از ریشهٔ مخزن این دستور را اجرا کنید:
+Make sure PostgreSQL is running, the empty `stage1` database has been created, `DATABASE_URL` is set in the current PowerShell session, and the Olist CSVs are in place. From the repository root, run:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\run_project.ps1
 ```
 
-اسکریپت محیط مجازی `.venv` را می‌سازد، وابستگی‌ها را نصب می‌کند، pipeline دادهٔ NYC 311 را اجرا می‌کند، schema و داده‌های PostgreSQL را بارگذاری می‌کند، تست‌ها را اجرا می‌کند و notebook بنچمارک را اجرا می‌کند. بارگیری مرحلهٔ NYC 311 به اینترنت دسترسی می‌خواهد. اسکریپت، دیتابیس PostgreSQL را خودش نصب یا راه‌اندازی نمی‌کند؛ سرویس باید از قبل فعال باشد.
+The script creates the `.venv` virtual environment, installs the project and test dependencies, runs the NYC 311 pipeline, creates and loads the PostgreSQL schema and data, runs the tests, and executes the benchmark notebook. The NYC 311 pipeline needs internet access. The script does not install or start PostgreSQL; the server must already be running.
 
-برای اجرای pipeline و تست‌ها بدون notebook بنچمارک:
+To run the pipeline and tests without executing the benchmark notebook:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\run_project.ps1 -SkipBenchmark
 ```
 
-بنچمارک با همین `DATABASE_URL` روی دیتابیس شما اجرا می‌شود و بعضی تنظیمات و indexهای تحلیلی آن را تغییر می‌دهد. برای دیتابیسی اجرا کنید که برای کار این پروژه در نظر گرفته‌اید.
+The benchmark uses the same `DATABASE_URL` and changes some analytical settings and indexes. Run it against the database you have set aside for this project.
 
-## اجرای تست‌ها به‌تنهایی
+## Run the tests separately
 
-پس از نصب وابستگی‌ها و تنظیم `DATABASE_URL`, تست‌ها را از ریشهٔ پروژه اجرا کنید:
+After installing the dependencies and setting `DATABASE_URL`, run the tests from the repository root:
 
 ```powershell
 python -m pytest -q
 ```
 
-بدون `DATABASE_URL` تست‌های PostgreSQL رد می‌شوند و فقط تست‌های مستقل از دیتابیس اجرا می‌شوند. تست بازبارگذاری کامل Olist اختیاری است و به دیتابیس جداگانهٔ آزمایشی نیاز دارد که نامش به `_test` ختم شود. دیتابیس تست باید جدا از `stage1` باشد، چون این تست داده‌های Olist را پاک و دوباره بارگذاری می‌کند:
+Without `DATABASE_URL`, PostgreSQL integration tests are skipped and only database-independent tests run. The full Olist reload test is optional and requires a separate test database whose name ends in `_test`. It must be separate from `stage1` because the test clears and reloads Olist data:
 
 ```powershell
 createdb -h localhost -U postgres stage1_test
@@ -83,18 +79,18 @@ $env:TEST_DATABASE_URL = "postgresql+psycopg://postgres:YOUR_PASSWORD@localhost:
 python -m pytest -q
 ```
 
-## اجرای مرحله‌های جداگانه
+## Run individual stages
 
-برای اجرای فقط مرحلهٔ NYC 311 (دریافت و پاک‌سازی داده‌ها):
+To run only the NYC 311 stage (fetch and curate the data):
 
 ```powershell
 python -m nyc311_factory --config config/default.json -v run
 ```
 
-برای ساخت schema و بارگذاری دادهٔ مرحلهٔ اول و Olist در PostgreSQL، پس از آماده بودن خروجی مرحلهٔ اول و فایل‌های CSV:
+To create the schema and load the stage-one and Olist data into PostgreSQL, first make sure the stage-one output and Olist CSV files are available:
 
 ```powershell
 python -m nyc311_factory --config config/default.json db-load
 ```
 
-گزارش طراحی، دلیل انتخاب ساختار و وضعیت اعتبارسنجی در [report.md](report.md) و جزئیات پیاده‌سازی DBA در [docs/challenge2.md](docs/challenge2.md) قرار دارد.
+The design rationale and verification status are documented in [report.md](report.md). DBA implementation details are in [docs/challenge2.md](docs/challenge2.md).
