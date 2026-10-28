@@ -4,6 +4,10 @@ data/raw/*
 data/state/*
 !data/state/.gitkeep
 data/demo_*/
+data/olist/*.csv
+.env
+reports/performance_results.json
+reports/dba_benchmark.executed.ipynb
 # large generated outputs (small ones such as the wide table and manifest are tracked)
 data/curated/case_level.csv
 data/curated/quarantine*.jsonl
