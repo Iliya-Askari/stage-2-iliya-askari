@@ -24,7 +24,7 @@ def build_parser():
     parser.add_argument("--max-batches", type=int, help="stop the download after N batches (resume later)")
     parser.add_argument("--refresh-population", action="store_true", help="re-download the population table")
     parser.add_argument("-v", "--verbose", action="store_true")
-    parser.add_argument("command", choices=["run", "fetch", "curate"], nargs="?", default="run")
+    parser.add_argument("command", choices=["run", "fetch", "curate", "pg-load", "olist-load", "db-load", "db-init", "db-tune"], nargs="?", default="run")
     return parser
 
 
@@ -44,7 +44,34 @@ def main(argv=None):
             as_of = date.fromisoformat(args.as_of) if args.as_of else None
         except ValueError as exc:
             raise ConfigError(f"--as-of must be YYYY-MM-DD: {exc}") from exc
-        if args.command == "fetch":
+        if args.command == "db-init":
+            from .postgres import initialize_database
+            initialize_database()
+            print("PostgreSQL DDL applied from sql/001_olist_schema.sql")
+        elif args.command == "db-tune":
+            from .postgres import apply_sql_file
+            apply_sql_file("sql/003_performance_indexes.sql")
+            print("Candidate performance indexes applied from sql/003_performance_indexes.sql")
+        elif args.command in ("pg-load", "db-load"):
+            if args.command == "db-load":
+                from .postgres import initialize_database
+                initialize_database()
+            from .postgres import load_curated_postgres
+            count = load_curated_postgres(cfg.paths.curated)
+            print(f"PostgreSQL load finished: rows={count} schema=factory table=stage1_cases")
+            if args.command == "db-load":
+                from .olist import load_olist
+                result = load_olist()
+                print(f"Olist PostgreSQL load finished: loaded={result['loaded']} rejected={result['rejected']} "
+                      f"by_reason={result['rejected_by_reason']} quarantine={result['quarantine_path']} "
+                      f"manifest={result['manifest_path']}")
+        elif args.command == "olist-load":
+            from .olist import load_olist
+            result = load_olist()
+            print(f"Olist PostgreSQL load finished: loaded={result['loaded']} rejected={result['rejected']} "
+                  f"by_reason={result['rejected_by_reason']} quarantine={result['quarantine_path']} "
+                  f"manifest={result['manifest_path']}")
+        elif args.command == "fetch":
             summary = run_fetch(cfg, as_of=as_of, max_batches=args.max_batches,
                                 refresh_population=args.refresh_population)
             print(f"fetch finished: records={summary['records']} completed={summary['completed']}")
